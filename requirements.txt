@@ -1,0 +1,6 @@
+flask
+anthropic
+requests
+beautifulsoup4
+urllib3
+gunicorn
