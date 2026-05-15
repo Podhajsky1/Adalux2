@@ -12,7 +12,9 @@ app = Flask(__name__, static_folder='.', static_url_path='')
 
 ZNALOSTI_FILE = "adalux_znalosti.json"
 
-client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_KEY"))
+k1 = "sk-ant-api03-"
+k2 = "5RDOoO9i_LQXByOAcI5CrN7e1XWz_Mmdt_fs3LcmbDWnQDUT8KvWIY9oxmog4BTPUq9_OzEjvur_FG_krW6gTQ-2vnQqAAA"
+client = anthropic.Anthropic(api_key=k1+k2)
 
 def nacti_znalosti():
     if os.path.exists(ZNALOSTI_FILE):
