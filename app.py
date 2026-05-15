@@ -50,29 +50,20 @@ Nepoužívej HLEDAT pokud odpověď znáš.
 
 def duckduckgo_search(query):
     try:
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-        url = f"https://html.duckduckgo.com/html/?q={requests.utils.quote(query)}&kl=cz-cs"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        url = f"https://api.duckduckgo.com/?q={requests.utils.quote(query)}&format=json&kl=cz-cs"
         response = requests.get(url, headers=headers, timeout=10)
-        soup = BeautifulSoup(response.text, "html.parser")
-        vysledky = []
-        for result in soup.select(".result__body")[:3]:
-            titulek = result.select_one(".result__title")
-            popis = result.select_one(".result__snippet")
-            if titulek and popis:
-                vysledky.append({
-                    "titulek": titulek.get_text(strip=True),
-                    "popis": popis.get_text(strip=True)
-                })
-        if not vysledky:
-            return None
-        obsah = f"Výsledky pro: {query}\n\n"
-        for v in vysledky:
-            obsah += f"• {v['titulek']}\n{v['popis']}\n\n"
-        return obsah
+        data = response.json()
+        obsah = ""
+        if data.get("AbstractText"):
+            obsah += f"{data['AbstractText']}\n\n"
+        for r in data.get("RelatedTopics", [])[:3]:
+            if isinstance(r, dict) and r.get("Text"):
+                obsah += f"• {r['Text']}\n\n"
+        return obsah if obsah else None
     except Exception as e:
         print(f"Chyba vyhledávání: {e}")
         return None
-
 def precti_url(url):
     try:
         if url.startswith("www."):
