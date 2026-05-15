@@ -12,8 +12,6 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 app = Flask(__name__, static_folder='.', static_url_path='')
 
 ANTHROPIC_KEY = os.environ.get("ANTHROPIC_KEY", "")
-GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY", "")
-GOOGLE_CSE_ID = os.environ.get("GOOGLE_CSE_ID", "")
 ZNALOSTI_FILE = "adalux_znalosti.json"
 
 client = anthropic.Anthropic(api_key=ANTHROPIC_KEY)
@@ -46,9 +44,34 @@ HLEDAT:vyhledávací dotaz
 
 Příklady:
 - "Kde je lékárna?" → HLEDAT:lékárna Rokytnice nad Jizerou
-- "Cena skipasu?" → HLEDAT:skipas cena 2026
+- "Cena skipasu?" → HLEDAT:skipas Rokytnice cena 2026
 Nepoužívej HLEDAT pokud odpověď znáš.
 {fakta_text}"""
+
+def duckduckgo_search(query):
+    try:
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+        url = f"https://html.duckduckgo.com/html/?q={requests.utils.quote(query)}&kl=cz-cs"
+        response = requests.get(url, headers=headers, timeout=10)
+        soup = BeautifulSoup(response.text, "html.parser")
+        vysledky = []
+        for result in soup.select(".result__body")[:3]:
+            titulek = result.select_one(".result__title")
+            popis = result.select_one(".result__snippet")
+            if titulek and popis:
+                vysledky.append({
+                    "titulek": titulek.get_text(strip=True),
+                    "popis": popis.get_text(strip=True)
+                })
+        if not vysledky:
+            return None
+        obsah = f"Výsledky pro: {query}\n\n"
+        for v in vysledky:
+            obsah += f"• {v['titulek']}\n{v['popis']}\n\n"
+        return obsah
+    except Exception as e:
+        print(f"Chyba vyhledávání: {e}")
+        return None
 
 def precti_url(url):
     try:
@@ -65,28 +88,6 @@ def precti_url(url):
         return nadpis, text
     except:
         return None, None
-
-def google_search(query):
-    try:
-        url = "https://www.googleapis.com/customsearch/v1"
-        params = {"key": GOOGLE_API_KEY, "cx": GOOGLE_CSE_ID, "q": query, "num": 3}
-        response = requests.get(url, params=params, timeout=10)
-        data = response.json()
-        if "items" not in data:
-            return None
-        obsah = f"Výsledky pro: {query}\n\n"
-        for item in data["items"]:
-            obsah += f"• {item.get('title','')}\n{item.get('snippet','')}\n\n"
-        try:
-            nadpis, text = precti_url(data["items"][0]["link"])
-            if text:
-                obsah += f"Detail:\n{text[:1500]}"
-        except:
-            pass
-        return obsah
-    except Exception as e:
-        print(f"Chyba vyhledávání: {e}")
-        return None
 
 @app.route("/")
 def index():
@@ -117,11 +118,10 @@ def chat():
         )
         odpoved = response.content[0].text
 
-        # Detekuj vyhledávání
         if odpoved.startswith("HLEDAT:"):
             dotaz = odpoved.replace("HLEDAT:", "").strip()
             print(f"🔍 Vyhledávám: {dotaz}")
-            vysledky = google_search(dotaz)
+            vysledky = duckduckgo_search(dotaz)
             if vysledky:
                 znalosti = nacti_znalosti()
                 znalosti["fakta"].append({"obsah": f"{dotaz}: {vysledky[:300]}", "datum": datetime.now().strftime("%d.%m.%Y %H:%M")})
